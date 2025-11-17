@@ -28,7 +28,7 @@ def get_sundays(year, month):
 year = st.number_input("Jahr", min_value=2020, max_value=2030, value=2025)
 month = st.number_input("Monat", min_value=1, max_value=12, value=4)
 
-employees = ["Anna", "Ben", "Clara", "David"]  # deine Mitarbeitenden
+employees = ["Shpresa", "Hümeysa", "Semi", "Janine", "Dona", "Ladina", "Matthias", "Saskia", "Julia"]  # deine Mitarbeitenden
 
 # ---- Sonntage holen ----
 sundays = get_sundays(year, month)
