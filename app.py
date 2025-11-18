@@ -1,45 +1,45 @@
 import streamlit as st
-from datetime import datetime, time
+from datetime import datetime
 import pandas as pd
-
-st.title('Dienstplan Sonntagsteam')
-st.divider()
-
-#sonntage berechnen
-
-import calendar
-from datetime import date
-
-def get_sundays(year, month):
-    sundays = []
-    month_calendar = calendar.monthcalendar(year, month)
-
-    for week in month_calendar:
-        sunday = week[calendar.SUNDAY]
-        if sunday != 0:                 # 0 bedeutet: kein Sonntag in dieser Woche
-            sundays.append(date(year, month, sunday))
-
-    return sundays
-
-#input
+import requests
+from ics import Calendar
 
 
-# ---- Benutzereingaben ----
-year = st.number_input("Jahr", min_value=2020, max_value=2030, value=2025)
-month = st.number_input("Monat", min_value=1, max_value=12, value=4)
+# Titel der App
+st.title("Uni-Sport Termine")
 
-employees = ["Shpresa", "Hümeysa", "Semi", "Janine", "Dona", "Ladina", "Matthias", "Saskia", "Julia"]  # deine Mitarbeitenden
+# ====== Konfiguration ======
+ical_url = "https://www.sportprogramm.unisg.ch/unisg/angebote/aktueller_zeitraum/_Pilates.html"  # z. B. https://unisport.uni.de/termine.ics
 
-# ---- Sonntage holen ----
-sundays = get_sundays(year, month)
+# ====== ICS-Datei laden ======
+try:
+    response = requests.get(ical_url)
+    response.raise_for_status()  # Fehler bei Verbindung werfen
+    calendar = Calendar(response.text)
+except Exception as e:
+    st.error(f"Fehler beim Laden des Kalenders: {e}")
+    st.stop()
 
-# ---- DataFrame erzeugen ----
-# Spalten sind Sonntage, Zeilen sind Mitarbeiter
-df = pd.DataFrame(index=employees, columns=[d.strftime("%d.%m.%Y") for d in sundays])
+# ====== Termine sortieren ======
+events = sorted(calendar.events, key=lambda e: e.begin)
 
-# Leere Zellen mit "" befüllen, damit die Tabelle sauber aussieht
-df = df.fillna("")
+# ====== Termine anzeigen ======
+if events:
+    for event in events:
+        start = event.begin.to('local').format('YYYY-MM-DD HH:mm')
+        end = event.end.to('local').format('HH:mm')
+        st.markdown(f"**{event.name}**  \n{start} – {end}  \n{event.location if event.location else ''}")
+else:
+    st.info("Keine Termine gefunden.")
 
-st.subheader("Dienstplan")
-st.dataframe(df)
+# ====== Filter nach Datum (optional) ======
+st.sidebar.header("Filter")
+selected_date = st.sidebar.date_input("Zeige Termine ab diesem Datum", datetime.today())
+
+filtered_events = [e for e in events if e.begin.date() >= selected_date]
+
+st.sidebar.subheader("Gefilterte Termine")
+for e in filtered_events:
+    start = e.begin.to('local').format('YYYY-MM-DD HH:mm')
+    st.sidebar.markdown(f"- {e.name} ({start})")
 
