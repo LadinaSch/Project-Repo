@@ -3,7 +3,7 @@ from datetime import datetime
 import pandas as pd
 import requests
 from ics import Calendar
-
+pip install ics
 
 # Titel der App
 st.title("Uni-Sport Termine")
