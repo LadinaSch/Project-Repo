@@ -71,7 +71,11 @@ def parse_datum(d):
     except:
         return None
 
-df["Datum_dt"] = df["Datum"].apply(parse_datum)
+if "Datum" in df.columns:
+    df["Datum_dt"] = df["Datum"].apply(parse_datum)
+else:
+    df["Datum_dt"] = None
+
 df = df.sort_values("Datum_dt")
 
 # Sidebar-Filter: ab Datum
