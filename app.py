@@ -1,87 +1,146 @@
 import streamlit as st
-import requests
-from bs4 import BeautifulSoup
-import pandas as pd
-from datetime import datetime
-import re
+from google_auth_oauthlib.flow import Flow
+from googleapiclient.discovery import build
+from datetime import datetime, timedelta, timezone
+from streamlit_calendar import calendar
+import urllib.parse
+from google.oauth2.credentials import Credentials
 
-st.title("Unisport HSG – Pilates Termine (robust)")
+#Rights I grant to Google
+SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
+#Redirect to my streamlit-website after Google-Login
+APP_URL = "https://projectrepo-nelb9xkappkqy6bhbwcmqwp.streamlit.app"
 
-url = "https://www.sportprogramm.unisg.ch/unisg/angebote/aktueller_zeitraum/_Pilates.html"
-response = requests.get(url)
-if response.status_code != 200:
-    st.error(f"Fehler beim Laden der Seite: {response.status_code}")
-    st.stop()
+#If token from my previous login is still available in the session, it recreates the credentials objects so that I stay logged in (in the Google-account)
+def get_google_creds():
+    if "gcal_token" in st.session_state:
+        return Credentials.from_authorized_user_info(st.session_state["gcal_token"], SCOPES)
+     
+    #Creates an OAuth flow using Google login, using my app's client_secret and client_id and requesting access to the calendar of the user that logs in with Google
+    flow = Flow.from_client_config(
+        st.secrets["GOOGLE_OAUTH_CLIENT"],
+        scopes=SCOPES,
+        redirect_uri=APP_URL
+    )
 
-soup = BeautifulSoup(response.text, "html.parser")
+    #Check if Google redirected the user back to the app with an OAuth code
+    #If yes: rebuild the redirect URL, trade the code for OAuth tokens, and save them so the user stays logged in.
+    qp = st.query_params
+    if "code" in qp:
+        current_url = APP_URL
+        if qp:
+            current_url += "?" + urllib.parse.urlencode(qp, doseq=True)
+        flow.fetch_token(authorization_response=current_url)
+        creds = flow.credentials
 
-# Tabelle auf der Seite finden
-table = soup.find("table")
-if table is None:
-    st.error("Keine Tabelle auf der Seite gefunden.")
-    st.stop()
+        #Save the OAuth tokens in the session so the user stays logged in on reloads
+        st.session_state["gcal_token"] = {
+            "token": creds.token,
+            "refresh_token": creds.refresh_token,
+            "token_uri": creds.token_uri,
+            "client_id": creds.client_id,
+            "client_secret": creds.client_secret,
+            "scopes": creds.scopes,
+        }
+        #Remove the temporary OAuth code from the URL after successful login
+        st.query_params.clear()
+        #Return the credentials so the app can access Google Calendar
+        return creds
+    else:
+        #If the user is NOT logged in yet: create the Google login URL
+        auth_url, _ = flow.authorization_url(
+            access_type="offline",
+            include_granted_scopes="true",
+            prompt="consent"
+        )
+        #Show a button that sends the user to the Google login page
+        st.link_button("Connect with Google", auth_url)
+        #Stop the script until the user completes the login
+        st.stop()
 
-rows = []
-for tr in table.find_all("tr"):
-    cols = [c.get_text(strip=True) for c in tr.find_all(["td", "th"])]
-    if cols:
-        rows.append(cols)
+#Run the login flow: return saved Google credentials if the user is logged in, or show the Google login button and stop the app if not.
+creds = get_google_creds()
 
-# DataFrame erstellen
-df = pd.DataFrame(rows[1:], columns=[c.strip() for c in rows[0]])
+#If credentials exist, the user is successfully logged in
+if creds:
+    try:
+        #Create a Google Calendar API service object using the user's credentials
+        service = build("calendar", "v3", credentials=creds)
 
-st.write("Rohdaten:")
-st.dataframe(df)
+        #Define the time window: from 1 day ago to 30 days in the future
+        time_min = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+        time_max = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
 
-# Prüfen, ob "Buchung"-Spalte existiert
-buchung_col = None
-for col in df.columns:
-    if "Buchung" in col:
-        buchung_col = col
-        break
+        #Load all calendars that belong to the user
+        cal_list = service.calendarList().list().execute()
+        calendars = cal_list.get("items", [])
 
-# Datum aus "Buchung" extrahieren
-def parse_buchung(buchung_text):
-    if not buchung_text:
-        return pd.NaT
-    # z.B. "ab 23.11., 12:30"
-    match = re.search(r"ab (\d{1,2}\.\d{1,2}\.)?,? ?(\d{1,2}:\d{2})?", buchung_text)
-    if match:
-        date_part = match.group(1)
-        time_part = match.group(2)
-        if date_part:
-            year = datetime.today().year
-            datum_str = f"{date_part}{year}"
+        #Prepare a list where all events from all calendars will be stored
+        google_events = []
+
+        # For every calendar of the user, fetch the events in the selected time window
+        for cal in calendars:
+            cal_id = cal["id"]
+            #calendar name (custom name if available, otherwise normal summary)
+            cal_summary = cal.get("summaryOverride", cal.get("summary", "Unknown calendar"))
+
             try:
-                datum = datetime.strptime(datum_str, "%d.%m.%Y")
-                if time_part:
-                    h, m = map(int, time_part.split(":"))
-                    datum = datum.replace(hour=h, minute=m)
-                return datum
-            except:
-                return pd.NaT
-    return pd.NaT
+                #Request up to 100 events from this calendar between time_min and time_max
+                events_result = service.events().list(
+                    calendarId=cal_id,
+                    timeMin=time_min,
+                    timeMax=time_max,
+                    maxResults=100,
+                    #expand recurring events into single instances
+                    singleEvents=True,
+                    #sort events by start time
+                    orderBy="startTime",
+                ).execute()
 
-if buchung_col:
-    df["Datum_dt"] = df[buchung_col].apply(parse_buchung)
-else:
-    df["Datum_dt"] = pd.NaT
-    st.warning("Keine 'Buchung'-Spalte gefunden. Datum wird leer bleiben.")
+                #Get the actual list of events from the API response
+                events = events_result.get("items", [])
 
-# Sortieren nach Datum
-df = df.sort_values("Datum_dt")
+                #Convert each Google event into a simple dictionary for our app
+                for event in events:
+                    #Show from which calendar the event comes + the event title
+                    summary = f"{cal_summary}: " + event.get("summary", "without titel")
+                    #Use dateTime if available, otherwise all-day date
+                    start = event["start"].get("dateTime", event["start"].get("date"))
+                    end = event["end"].get("dateTime", event["end"].get("date"))
 
-# Sidebar Filter
-st.sidebar.header("Filter")
-selected_date = st.sidebar.date_input("Zeige Termine ab", datetime.today())
-df_filtered = df[df["Datum_dt"] >= pd.to_datetime(selected_date, errors="coerce")]
+                    #Add the event to the unified list used for display and the calendar widget
+                    google_events.append({
+                        "title": summary,
+                        "start": start,
+                        "end": end,
+                    })
 
-# Anzeige: nur existierende Spalten zeigen
-columns_to_show = ["Details", "Datum_dt", "Zeit", "Ort", "Buchung"]
-columns_exist = [c for c in columns_to_show if c in df_filtered.columns]
+            #If this calendar cannot be read, show a warning but continue with the others
+            except Exception as e:
+                st.warning(f"Calendar '{cal_summary}' could not be started: {e}")
 
-st.subheader("Gefilterte Termine")
-st.dataframe(df_filtered[columns_exist].reset_index(drop=True))
+        #Sort all collected events from all calendars by their start time
+        google_events.sort(key=lambda x: x["start"])
+
+
+
+        #Show a visual calendar overview using streamlit-calendar
+        st.subheader("Calendar overview")
+        formatting = {
+            "initialView": "timeGridWeek",
+            "height": 650,
+            "locale": "en",
+            "weekNumbers": True,
+            "selectable": True,
+            "nowIndicator": True,
+        }
+
+        #Display all events in an interactive calendar view
+        calendar(google_events, formatting)
+
+    #If anything goes wrong in the whole calendar loading process, show an error message
+    except Exception as e:
+        st.error(f"Error loading calendar data: {e}")
 
 
          
