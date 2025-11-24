@@ -5,6 +5,8 @@ from datetime import datetime, timedelta, timezone
 from streamlit_calendar import calendar
 import urllib.parse
 from google.oauth2.credentials import Credentials
+from appointment_data.excel_events import load_excel_events, add_appointment
+
 
 #Rights I grant to Google
 SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
@@ -121,6 +123,16 @@ if creds:
 
         #Sort all collected events from all calendars by their start time
         google_events.sort(key=lambda x: x["start"])
+        
+        # Load Excel appointments
+        excel_events = load_excel_events()
+        
+        # Merge
+        all_events = google_events + excel_events
+        
+        # Sort combined list
+        all_events.sort(key=lambda x: x["start"])
+
 
 
 
@@ -136,7 +148,7 @@ if creds:
         }
 
         #Display all events in an interactive calendar view
-        calendar(google_events, formatting)
+        calendar(all_events, formatting)
 
     #If anything goes wrong in the whole calendar loading process, show an error message
     except Exception as e:
