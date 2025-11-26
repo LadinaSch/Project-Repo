@@ -5,7 +5,8 @@ from pathlib import Path
 EXCEL_FILE = "appointments.xlsx"
 
 # Path to your Excel file
-EXCEL_PATH = Path(__file__).parent / "appointments.xlsx"
+EXCEL_PATH = Path(__file__).parent / "appointment_data" / "appointments.xlsx"
+
 
 def load_excel_events():
     """Load appointments from Excel and convert them into calendar events."""
