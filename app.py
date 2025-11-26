@@ -61,7 +61,7 @@ APP_URL = "https://projectrepo-nelb9xkappkqy6bhbwcmqwp.streamlit.app"
         st.stop()
 
 #Run the login flow: return saved Google credentials if the user is logged in, or show the Google login button and stop the app if not.
-creds = get_google_creds()
+# creds = get_google_creds()
 
 #If credentials exist, the user is successfully logged in
 if creds:
