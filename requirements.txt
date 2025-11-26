@@ -12,3 +12,4 @@ python-dateutil
 google-auth
 beautifulsoup4
 pathlib
+openpyxl
