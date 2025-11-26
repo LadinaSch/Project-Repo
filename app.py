@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from streamlit_calendar import calendar
 import urllib.parse
 from google.oauth2.credentials import Credentials
-from appointment_data.excel_events import load_excel_events, add_appointment
+
 
 
 #Rights I grant to Google
