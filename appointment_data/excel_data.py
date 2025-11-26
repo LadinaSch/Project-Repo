@@ -42,3 +42,7 @@ def add_appointment(title, start, end):
 
     df = pd.concat([df, new_row], ignore_index=True)
     df.to_excel(EXCEL_PATH, index=False)
+
+
+import os
+st.write("Files in working directory:", os.listdir("."))
