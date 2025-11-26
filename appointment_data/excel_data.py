@@ -2,21 +2,19 @@ import pandas as pd
 import streamlit as st
 from pathlib import Path
 
-EXCEL_FILE = "appointments.xlsx"
-
-# Path to your Excel file
-EXCEL_PATH = Path(__file__).parent / "appointment_data" / "appointments.xlsx"
-
-
+# FIXED PATH — this is where your file actually is
+EXCEL_PATH = Path(__file__).parent / "appointments.xlsx"
 
 def load_excel_events():
     """Load appointments from Excel and convert them into calendar events."""
     try:
+        st.write("🔍 Loading Excel from:", EXCEL_PATH)
+
         df = pd.read_excel(EXCEL_PATH)
 
         required_cols = {"title", "start", "end"}
         if not required_cols.issubset(df.columns):
-            st.error("appointments.xlsx must contain the columns: title, start, end")
+            st.error("appointments.xlsx must contain: title, start, end")
             return []
 
         df["start"] = pd.to_datetime(df["start"]).astype(str)
@@ -46,5 +44,7 @@ def add_appointment(title, start, end):
     df.to_excel(EXCEL_PATH, index=False)
 
 
-import os
-st.write("Files in working directory:", os.listdir("."))
+
+
+
+
