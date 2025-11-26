@@ -14,16 +14,16 @@ SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 APP_URL = "https://projectrepo-nelb9xkappkqy6bhbwcmqwp.streamlit.app"
 
 #If token from my previous login is still available in the session, it recreates the credentials objects so that I stay logged in (in the Google-account)
-def get_google_creds():
-    if "gcal_token" in st.session_state:
-        return Credentials.from_authorized_user_info(st.session_state["gcal_token"], SCOPES)
+# def get_google_creds():
+#    if "gcal_token" in st.session_state:
+ #       return Credentials.from_authorized_user_info(st.session_state["gcal_token"], SCOPES)
      
     #Creates an OAuth flow using Google login, using my app's client_secret and client_id and requesting access to the calendar of the user that logs in with Google
-    flow = Flow.from_client_config(
-        st.secrets["GOOGLE_OAUTH_CLIENT"],
-        scopes=SCOPES,
-        redirect_uri=APP_URL
-    )
+  #  flow = Flow.from_client_config(
+   #     st.secrets["GOOGLE_OAUTH_CLIENT"],
+    #    scopes=SCOPES,
+    #    redirect_uri=APP_URL
+    #)
 
     #Check if Google redirected the user back to the app with an OAuth code
     #If yes: rebuild the redirect URL, trade the code for OAuth tokens, and save them so the user stays logged in.
