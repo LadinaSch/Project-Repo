@@ -2,6 +2,8 @@ import pandas as pd
 import streamlit as st
 from pathlib import Path
 
+EXCEL_FILE = "appointments.xlsx"
+
 # Path to your Excel file
 EXCEL_PATH = Path(__file__).parent / "appointments.xlsx"
 
