@@ -2,6 +2,15 @@ import streamlit as st
 from datetime import datetime, timedelta, timezone
 from streamlit_calendar import calendar
 
+import os
+st.write("Root directory:", os.listdir("."))
+if os.path.exists("appointment_data"):
+    st.write("appointment_data folder:", os.listdir("appointment_data"))
+else:
+    st.write("appointment_data folder does NOT exist.")
+
+
+
 # ----------------------------------------
 # TEMPORARY: GOOGLE LOGIN DISABLED
 # ----------------------------------------
